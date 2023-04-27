@@ -7,11 +7,16 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from keras.wrappers.scikit_learn import KerasRegressor
-from keras.models import Sequential
-from tensorflow.keras.layers import Dropout, Dense, LSTM
 # import torch
 import pickle
 import os
+from keras.layers import Masking, Embedding
+import tensorflow as tf
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Activation, Dropout
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, RepeatVector
+from tensorflow.keras.callbacks import History, EarlyStopping
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 city = ["陕西", "铜川", "西安", "渭南", "汉中", "宝鸡", "安康", "咸阳", "西咸", "延安", "榆林"]
 
@@ -31,21 +36,53 @@ def get_length(city_num):
 def createXY(dataset, n_past):
     dataX = []
     dataY = []
-    for i in range(n_past, len(dataset)-90):
-        dataX.append(dataset[i - n_past:i, 0:dataset.shape[1]])
-        dataY.append(dataset[i:i+90, 0])
+    time_step = 90
+    for i in range(len(dataset)-n_past-time_step):
+        dataX.append(dataset[i:i+n_past, :])
+        dataY.append(dataset[i+n_past:i+n_past+time_step, 0])
     return np.array(dataX), np.array(dataY)
 
 
-def build_model(optimizer):
+def build_model():
 
     grid_model = Sequential()
-    grid_model.add(LSTM(128, return_sequences=True))
-    grid_model.add(LSTM(128))
+    #CNN
+    grid_model.add(Conv2D(
+        filters=32,
+        kernel_size=(3,3),
+        activation=('relu'),
+        padding='SAME',
+        input_shape=(180, 13, 1),
+        kernel_initializer=tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=42)))
+
+    grid_model.add(MaxPooling2D(pool_size=(2,2)))
+
+    grid_model.add(Conv2D(
+        filters=64,
+        kernel_size=(3,3),
+        activation=('relu'),
+        padding='SAME'))
+
+    grid_model.add(Flatten())
+    
+    grid_model.add(RepeatVector(90))
+    grid_model.add(LSTM(128, return_sequences=False))
+    grid_model.add(Dropout(0.2))
+
+    grid_model.add(Dense(90))
+    grid_model.add(Activation("relu"))
+    '''
+    #LSTM
+    grid_model.add(Masking(mask_value= -1,input_shape=(sequenceLength, 13)))
+    grid_model.add(LSTM(128,  input_shape=(sequenceLength, 13)))
+
+    #grid_model.add(LSTM(128, return_sequences=True))
+    #grid_model.add(LSTM(128))
     grid_model.add(Dropout(0.2))
     grid_model.add(Dense(90))
-
-    grid_model.compile(loss='mse', optimizer=optimizer)
+    '''
+    grid_model.compile(loss='mse', optimizer='adam')
+    grid_model.summary()
     return grid_model
 
 
@@ -67,17 +104,20 @@ def LSTM_model(i, city_num):
     k = 1
     train_size = int(len(init_data) * k)
     feature_num = init_data.shape[1]
-    train_step = 30
+    train_step = 180
 
     df_for_training = init_data[:train_size]
     df_for_testing = init_data[train_size:]
     trainX, trainY = createXY(df_for_training, train_step)
     testX, testY = createXY(df_for_testing, train_step)
     print(init_data.shape, trainX.shape, trainY.shape)
-    sys.exit()
+    #sys.exit()
+    max_length = 180
+    trainX = pad_sequences(trainX, maxlen=max_length, padding='post', truncating='post')
     grid_model = KerasRegressor(build_fn=build_model, verbose=2, validation_data=(testX, testY), batch_size=64,
-                                epochs=20, optimizer='adam')
+                                epochs=200)
     grid_model.fit(trainX, trainY)
+
     folder_path = "modelpth/{}".format(city[city_num])
     os.makedirs(folder_path, exist_ok=True)
     MODEL_PATH = 'modelpth/{}/{}.pth'.format(city[city_num], industry_name)
