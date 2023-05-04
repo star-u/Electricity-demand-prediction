@@ -200,7 +200,7 @@ def get_pred(city_name, industry_name, file_path):
                                                            :]),
                                                axis=0)
                     #ele = np.concatenate((ele, np.array([table.row_values(j + 1)[index]])), axis=0)
-        MODEL_PATH = 'modelpth/{}/{}.pth'.format(city_name, industry_name)
+        MODEL_PATH = 'modelpth2/{}/{}.pth'.format(city_name, industry_name)
         with open(MODEL_PATH, 'rb') as file:
             grid_model = pickle.load(file)
         #testX = np.array([0])
@@ -210,10 +210,11 @@ def get_pred(city_name, industry_name, file_path):
         init_data = np.expand_dims(init_data,axis=0)
         print(init_data.shape)
         #print(testX.shape)
-        max_length = 180
+        max_length = 30
         init_data_padded = pad_sequences(init_data, maxlen=max_length, padding='post', truncating='post')
+        #print(init_data_padded)
         prediction = grid_model.predict(init_data_padded)
-        print(prediction.shape)
+        print(prediction)
         
         y_pred = np.reshape(prediction, (len(prediction), 1))
         y_pred_list = list(np.squeeze(y_pred))
@@ -226,7 +227,7 @@ def get_pred(city_name, industry_name, file_path):
             dateTime_p = datetime.datetime.strptime(str_p, '%Y-%m-%d %H:%M:%S')
             time_list.append(str(dateTime_p)[:10])
 
-        for j in range(len(time_list)):
+        for j in range(max_length):
             prediction_tuple.append((time_list[j], y_pred_list[j]))
     return prediction_tuple
 

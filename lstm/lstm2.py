@@ -18,7 +18,11 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, RepeatVector
 from tensorflow.keras.callbacks import History, EarlyStopping
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-city = ["陕西", "铜川", "西安", "渭南", "汉中", "宝鸡", "安康", "咸阳", "西咸", "延安", "榆林"]
+import warnings
+
+warnings.filterwarnings('ignore')
+
+city = ["陕西", "铜川", "西安", "渭南", "汉中", "宝鸡", "安康", "咸阳", "西咸", "延安", "榆林","商洛"]
 
 
 def get_length(city_num):
@@ -38,7 +42,7 @@ def createXY(dataset, n_past):
     dataY = []
     time_step = 30
     for i in range(len(dataset)-n_past-time_step):
-        dataX.append(dataset[i:i+n_past, :])
+        dataX.append(dataset[i:i+n_past,:])
         dataY.append(dataset[i+n_past:i+n_past+time_step, 0])
     return np.array(dataX), np.array(dataY)
 
@@ -76,17 +80,17 @@ def LSTM_model(i, city_num):
     industry_name = table.row_values(0)[i + 1]
 
     init_data = np.array(
-        ([table.row_values(1)[i + 1]] + [table.row_values(1)[i + 1 + 13]] + table.row_values(1)[i + 1 + 26:])).reshape(
+        ([table.row_values(1)[i + 1]] + [table.row_values(1)[i + 1 + 13]] + table.row_values(1)[27:27+11])).reshape(
         -1)[np.newaxis, :]
+
     length = get_length(city_num)
     for j in range(1, length):
-        init_data = np.concatenate((init_data, np.array(([table.row_values(j + 1)[i + 1]] + [
-            table.row_values(j + 1)[i + 1 + 13]] + table.row_values(j + 1)[i + 1 + 26:])).reshape(-1)[np.newaxis, :]),
+        if  not isinstance(table.row_values(j+1)[i+1],str) and not isinstance(table.row_values(j+1)[i+1+13],str):
+            init_data = np.concatenate((init_data, np.array(([table.row_values(j + 1)[i + 1]] + [table.row_values(j + 1)[i + 1 + 13]] + table.row_values(j + 1)[27:27+11])).reshape(-1)[np.newaxis, :]),
                                    axis=0)
 
-    k = 0.8
+    k = 1
     train_size = int(len(init_data) * k)
-    feature_num = init_data.shape[1]
     train_step = 30
 
     df_for_training = init_data[:train_size]
@@ -98,7 +102,7 @@ def LSTM_model(i, city_num):
     #max_length = 180
     #trainX = pad_sequences(trainX, maxlen=max_length, padding='post', truncating='post')
     grid_model = KerasRegressor(build_fn=build_model, verbose=2, validation_data=(testX, testY), batch_size=64,
-                                epochs=5000)
+                                epochs=20)
     grid_model.fit(trainX, trainY)
 
     folder_path = "modelpth2/{}".format(city[city_num])
@@ -112,8 +116,8 @@ def LSTM_model(i, city_num):
 
 
 
-for city_num in range(len(city)):
+for city_num in range(11,len(city)):
     for i in range(13):
         LSTM_model(i, city_num)
         #test_model(i, city_num)
-        sys.exit()
+        #sys.exit()
